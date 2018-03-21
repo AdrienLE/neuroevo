@@ -2,9 +2,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
-import gym
 import random
-import cv2
 import numpy as np
 
 def step(env, *args):
@@ -16,6 +14,7 @@ def reset(env):
     return convert_state(env.reset())
 
 def convert_state(state):
+    import cv2
     return cv2.resize(cv2.cvtColor(state, cv2.COLOR_RGB2GRAY), (64, 64)) / 255.0
 
 class Model(nn.Module):
@@ -84,11 +83,9 @@ class CompressedModel:
     def evolve(self, sigma, rng_state=None):
         self.other_rng.append((sigma, rng_state if rng_state is not None else random_state()))
         
-ENVS = {}
 def evaluate_model(env, model, max_eval=20000, max_noop=30):
-    if env not in ENVS:
-        ENVS[env] = gym.make(env)
-    env = ENVS[env]
+    import gym
+    env = gym.make(env)
     model = uncompress_model(model)
     noops = random.randint(0, max_noop)
     cur_states = [reset(env)] * 4
