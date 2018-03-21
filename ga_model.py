@@ -1,3 +1,6 @@
+import mkl
+mkl.set_num_threads(1)
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
