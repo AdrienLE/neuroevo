@@ -101,8 +101,10 @@ def evaluate_model(env, model, max_eval=20000, max_noop=30):
             return total_reward
         cur_states.append(new_state)
 
+    total_frames = 0
     model.eval()
     for _ in range(max_eval):
+        total_frames += 4
         values = model(Variable(torch.Tensor([cur_states])))[0]
         action = np.argmax(values.data.numpy())
         new_state, reward, is_done, _ = step(env, action)
@@ -113,4 +115,4 @@ def evaluate_model(env, model, max_eval=20000, max_noop=30):
         cur_states.append(new_state)
 
     print('\t', total_reward)
-    return total_reward
+    return total_reward, total_frames
