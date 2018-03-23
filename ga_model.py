@@ -32,7 +32,7 @@ class Model(nn.Module):
         self.out = nn.Linear(512, 18)
         
         self.rng_state = rng_state
-        torch.set_rng_state(rng_state)
+        torch.manual_seed(rng_state)
             
         self.evolve_states = []
             
@@ -54,7 +54,8 @@ class Model(nn.Module):
         return self.out(x)
     
     def evolve(self, sigma, rng_state):
-        torch.set_rng_state(rng_state)
+        torch.manual_seed(rng_state)
+        self.evolve_states.append((sigma, rng_state))
             
         for name, tensor in sorted(self.named_parameters()):
             to_add = self.add_tensors[tensor.size()]
@@ -71,12 +72,8 @@ def uncompress_model(model):
         m.evolve(sigma, rng)
     return m
 
-state_generator = torch._C.Generator()
-state_iterator = torch.Tensor(1)
-
 def random_state():
-    state_iterator.normal_(generator=state_generator)
-    return state_generator.get_state()
+    return random.randint(0, 2**31-1)
 
 class CompressedModel:
     def __init__(self, start_rng=None, other_rng=None):
