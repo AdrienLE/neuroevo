@@ -1,6 +1,3 @@
-import mkl
-mkl.set_num_threads(1)
-
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -18,18 +15,18 @@ def reset(env):
 
 def convert_state(state):
     import cv2
-    return cv2.resize(cv2.cvtColor(state, cv2.COLOR_RGB2GRAY), (64, 64)) / 255.0
+    return cv2.resize(cv2.cvtColor(state, cv2.COLOR_RGB2GRAY), (84, 84)) / 255.0
 
 class Model(nn.Module):
     def __init__(self, rng_state):
         super().__init__()
         
         # TODO: padding?
-        self.conv1 = nn.Conv2d(4, 32, (8, 8), 4)
-        self.conv2 = nn.Conv2d(32, 64, (4, 4), 2)
-        self.conv3 = nn.Conv2d(64, 64, (3, 3), 1)
-        self.dense = nn.Linear(4*4*64, 512)
-        self.out = nn.Linear(512, 18)
+        self.conv1 = nn.Conv2d(4, 16, 8, stride=4)
+        self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
+        #self.conv3 = nn.Conv2d(64, 64, (3, 3), 1)
+        self.dense = nn.Linear(32 * 9 * 9, 256)
+        self.out = nn.Linear(256, 18)
         
         self.rng_state = rng_state
         torch.manual_seed(rng_state)
@@ -48,8 +45,8 @@ class Model(nn.Module):
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = x.view(1, -1)
+        #x = F.relu(self.conv3(x))
+        x = x.view(x.size(0), -1)
         x = F.relu(self.dense(x))
         return self.out(x)
     
@@ -83,13 +80,16 @@ class CompressedModel:
     def evolve(self, sigma, rng_state=None):
         self.other_rng.append((sigma, rng_state if rng_state is not None else random_state()))
         
-def evaluate_model(env, model, max_eval=20000, max_noop=30):
+def evaluate_model(env, model, max_eval=20000, max_noop=30, render=False, cuda=False):
     import gym
     env = gym.make(env)
     model = uncompress_model(model)
+    if cuda:
+        model.cuda()
     noops = random.randint(0, max_noop)
     cur_states = [reset(env)] * 4
     total_reward = 0
+    if render: env.render()
     for _ in range(noops):
         cur_states.pop(0)
         new_state, reward, is_done, _ = step(env, 0)
@@ -97,20 +97,26 @@ def evaluate_model(env, model, max_eval=20000, max_noop=30):
         if is_done:
             return total_reward
         cur_states.append(new_state)
+        if render: env.render()
 
     total_frames = 0
     model.eval()
     for _ in range(max_eval):
         total_frames += 4
-        values = model(Variable(torch.Tensor([cur_states])))[0]
+        cur_state_var = Variable(torch.Tensor([cur_states]))
+        if cuda:
+            cur_state_var = cur_state_var.cuda()
+        values = model(cur_state_var)[0]
+        if cuda:
+            values = values.cpu()
         action = np.argmax(values.data.numpy()[:env.action_space.n])
-        print(action)
         new_state, reward, is_done, _ = step(env, action)
         total_reward += reward
         if is_done:
             break
         cur_states.pop(0)
         cur_states.append(new_state)
+        if render: env.render()
+    if render: env.render(close=True)
 
-    print('\t', total_reward)
     return total_reward, total_frames
