@@ -8,19 +8,18 @@ class GA:
 
     # Note: the paper says "20k frames", but there are 4 frames per network
     # evaluation, so we cap at 5k evaluations
-    def get_best_models(self, env, max_eval=5000, max_noop=30, cuda=False):
+    def get_best_models(self, env, max_eval=5000):
         results = []
         for m in self.models:
-            results.append(evaluate_model(env, m, max_eval=max_eval, max_noop=max_noop,cuda=cuda))
+            results.append(evaluate_model(env, m, max_eval=max_eval, cuda=self.cuda))
         used_frames = sum([r[1] for r in results])
         scores = [r[0] for r in results]
         scored_models = list(zip(self.models, scores))
         scored_models.sort(key=lambda x: x[1], reverse=True)
         return scored_models, used_frames
 
-    def evolve_iter(self, env, sigma=0.005, truncation=10, max_eval=5000, max_noop=30):
-        scored_models, used_frames = self.get_best_models(env, max_eval=max_eval,
-                max_noop=max_noop, cuda=self.cuda)
+    def evolve_iter(self, env, sigma=0.005, truncation=10, max_eval=5000):
+        scored_models, used_frames = self.get_best_models(env, max_eval=max_eval )
         scores = [s for _, s in scored_models]
         median_score = np.median(scores)
         mean_score = np.mean(scores)

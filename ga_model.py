@@ -4,29 +4,33 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 import random
 import numpy as np
+from envs import make_env
 
 def step(env, *args):
     state, a, b, c = env.step(*args)
-    state = convert_state(state)
+    #state = convert_state(state)
+    state = state
     return state, a, b, c
 
 def reset(env):
-    return convert_state(env.reset())
+    return env.reset()
+    #return convert_state(env.reset())
 
 def convert_state(state):
     import cv2
     return cv2.resize(cv2.cvtColor(state, cv2.COLOR_RGB2GRAY), (84, 84)) / 255.0
+    #return cv2.resize(cv2.cvtColor(state, cv2.COLOR_RGB2GRAY), (64, 64)) / 255.0
 
 class Model(nn.Module):
     def __init__(self, rng_state):
         super().__init__()
         
         # TODO: padding?
-        self.conv1 = nn.Conv2d(4, 16, 8, stride=4)
-        self.conv2 = nn.Conv2d(16, 32, 4, stride=2)
-        #self.conv3 = nn.Conv2d(64, 64, (3, 3), 1)
-        self.dense = nn.Linear(32 * 9 * 9, 256)
-        self.out = nn.Linear(256, 18)
+        self.conv1 = nn.Conv2d(4, 32, 8, stride=4)
+        self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
+        self.conv3 = nn.Conv2d(64, 64, 3, 1)
+        self.dense = nn.Linear(64 * 7 * 7, 512)
+        self.out = nn.Linear(512, 18)
         
         self.rng_state = rng_state
         torch.manual_seed(rng_state)
@@ -45,7 +49,7 @@ class Model(nn.Module):
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        #x = F.relu(self.conv3(x))
+        x = F.relu(self.conv3(x))
         x = x.view(x.size(0), -1)
         x = F.relu(self.dense(x))
         return self.out(x)
@@ -80,30 +84,33 @@ class CompressedModel:
     def evolve(self, sigma, rng_state=None):
         self.other_rng.append((sigma, rng_state if rng_state is not None else random_state()))
         
-def evaluate_model(env, model, max_eval=20000, max_noop=30, render=False, cuda=False):
-    import gym
-    env = gym.make(env)
-    model = uncompress_model(model)
+def evaluate_model(env, model, max_eval=20000, env_seed=2018, render=False, cuda=False):
+    env = make_env(env,env_seed,0,None)()
+    if isinstance(model, CompressedModel):
+        model = uncompress_model(model)
     if cuda:
         model.cuda()
-    noops = random.randint(0, max_noop)
-    cur_states = [reset(env)] * 4
-    total_reward = 0
+    obs_shape = env.observation_space.shape
+    obs_shape = (obs_shape[0] * 4, *obs_shape[1:])
+    current_obs = torch.zeros(1, *obs_shape)
+
+    def update_current_obs(obs):
+        shape_dim0 = env.observation_space.shape[0]
+        obs = torch.from_numpy(obs).float()
+        current_obs[:,:-shape_dim0] = current_obs[:,shape_dim0:]
+        current_obs[:,-shape_dim0:] = obs
+
     if render: env.render()
-    for _ in range(noops):
-        cur_states.pop(0)
-        new_state, reward, is_done, _ = step(env, 0)
-        total_reward += reward
-        if is_done:
-            return total_reward
-        cur_states.append(new_state)
-        if render: env.render()
+
+    obs = env.reset()
+    update_current_obs(obs)
 
     total_frames = 0
     model.eval()
+    total_reward = 0.0
     for _ in range(max_eval):
         total_frames += 4
-        cur_state_var = Variable(torch.Tensor([cur_states]))
+        cur_state_var = Variable(current_obs)
         if cuda:
             cur_state_var = cur_state_var.cuda()
         values = model(cur_state_var)[0]
@@ -114,9 +121,11 @@ def evaluate_model(env, model, max_eval=20000, max_noop=30, render=False, cuda=F
         total_reward += reward
         if is_done:
             break
-        cur_states.pop(0)
-        cur_states.append(new_state)
+        update_current_obs(new_state)
         if render: env.render()
-    if render: env.render(close=True)
 
     return total_reward, total_frames
+
+if __name__ == '__main__':
+    model = Model(rng_state=1)
+    print(evaluate_model('FrostbiteNoFrameskip-v4',model))
