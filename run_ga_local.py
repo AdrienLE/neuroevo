@@ -14,8 +14,12 @@ parser.add_argument('--total-frames', type=int, default=10000000,
         help='Total frames to play (default: 10000000)')
 parser.add_argument('--population', type=int, default=50,
         help='Population of GA (default: 50)')
+parser.add_argument('--seed', type=int, default=2018,
+        help='Random seed for GA (default: 2018)')
+
 parser.add_argument('--env-name', default='FrostbiteDeterministic-v4',
         help='environment to train on (default: FrostbiteDeterministic-v4)')
+
 parser.add_argument('--save-interval', type=int, default=1,
         help='save interval. (default: 1)')
 parser.add_argument('--save-dir', default='./trained_models/',
@@ -33,7 +37,7 @@ args.vis = not args.no_vis
 
 
 vis = visdom.Visdom(env=args.env_name)
-ga = GA(args.population, cuda=args.cuda)
+ga = GA(args.population, cuda=args.cuda, seed=args.seed)
 
 def save_model(model, it=None):
     if isinstance(model, ga_model.CompressedModel):

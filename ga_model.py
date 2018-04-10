@@ -74,6 +74,7 @@ def uncompress_model(model):
     return m
 
 def random_state():
+    print('random_state()')
     return random.randint(0, 2**31-1)
 
 class CompressedModel:
@@ -87,6 +88,7 @@ class CompressedModel:
 def evaluate_model(env, model, max_eval=20000, max_noop=30,env_seed=2018, render=False, cuda=False):
     import gym
     env = gym.make(env)
+    env.seed(env_seed)
     if render: env.render()
 
     if isinstance(model, CompressedModel):
