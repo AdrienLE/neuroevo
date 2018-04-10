@@ -10,12 +10,12 @@ import ga_model
 from local_ga import GA
 
 parser = argparse.ArgumentParser(description='GA RL')
-parser.add_argument('--total-frames', type=int, default=50000000,
-        help='Total frames to play (default: 50000000)')
-parser.add_argument('--population', type=int, default=10,
-        help='Population of GA (default: 10)')
-parser.add_argument('--env-name', default='FrostbiteNoFrameskip-v4',
-        help='environment to train on (default: FrostbiteNoFrameskip-v4)')
+parser.add_argument('--total-frames', type=int, default=10000000,
+        help='Total frames to play (default: 10000000)')
+parser.add_argument('--population', type=int, default=50,
+        help='Population of GA (default: 50)')
+parser.add_argument('--env-name', default='FrostbiteDeterministic-v4',
+        help='environment to train on (default: FrostbiteDeterministic-v4)')
 parser.add_argument('--save-dir', default='./trained_models/',
         help='directory to save agent logs (default: ./trained_models/)')
 parser.add_argument('--no-cuda', action='store_true', default=False,

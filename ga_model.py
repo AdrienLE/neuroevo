@@ -8,13 +8,13 @@ from envs import make_env
 
 def step(env, *args):
     state, a, b, c = env.step(*args)
-    #state = convert_state(state)
-    state = state
+    state = convert_state(state)
+    #state = state
     return state, a, b, c
 
 def reset(env):
-    return env.reset()
-    #return convert_state(env.reset())
+    #return env.reset()
+    return convert_state(env.reset())
 
 def convert_state(state):
     import cv2
@@ -84,7 +84,48 @@ class CompressedModel:
     def evolve(self, sigma, rng_state=None):
         self.other_rng.append((sigma, rng_state if rng_state is not None else random_state()))
         
-def evaluate_model(env, model, max_eval=20000, env_seed=2018, render=False, cuda=False):
+def evaluate_model(env, model, max_eval=20000, max_noop=30,env_seed=2018, render=False, cuda=False):
+    import gym
+    env = gym.make(env)
+    if render: env.render()
+
+    if isinstance(model, CompressedModel):
+        model = uncompress_model(model)
+    if cuda:
+        model.cuda()
+    noops = random.randint(0, max_noop)
+    cur_states = [reset(env)] * 4
+    total_reward = 0
+    for _ in range(noops):
+        cur_states.pop(0)
+        new_state, reward, is_done, _ = step(env, 0)
+        total_reward += reward
+        if is_done:
+            return total_reward
+        cur_states.append(new_state)
+
+    total_frames = 0
+    model.eval()
+    for _ in range(max_eval):
+        total_frames += 4
+        cur_state_var = Variable(torch.Tensor([cur_states]))
+        if cuda:
+            cur_state_var = cur_state_var.cuda()
+        values = model(cur_state_var)[0]
+        action = np.argmax(values.cpu().data.numpy()[:env.action_space.n])
+        new_state, reward, is_done, _ = step(env, action)
+        total_reward += reward
+        if is_done:
+            break
+        cur_states.pop(0)
+        cur_states.append(new_state)
+        if render: env.render()
+
+
+    #print('\t', total_reward)
+    return total_reward, total_frames
+
+def evaluate_model_clipped(env, model, max_eval=20000, env_seed=2018, render=False, cuda=False):
     env = make_env(env,env_seed,0,None)()
     if isinstance(model, CompressedModel):
         model = uncompress_model(model)
