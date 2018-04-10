@@ -1,5 +1,6 @@
 import copy
 from ga_model import *
+from utils import RandomGenerator
 class ScoredModel:
     def __init__(self, model,score=None):
         self.model = model
@@ -13,14 +14,19 @@ class ScoredModel:
         return self.score, used_frames
 
 class GA:
-    def __init__(self, population, compressed_models=None, cuda=False):
+    def __init__(self, population, compressed_models=None, cuda=False, seed=None):
         self.population = population
         if compressed_models is None:
             self.models = [ScoredModel(CompressedModel()) for _ in range(population)]
         else:
             self.models = [ScoredModel(c) for c in compressed_models]
         self.cuda=cuda
-
+        if seed is not None:
+            self.rng = RandomGenerator(rng=seed)
+        if self.rng:
+            self.models = [CompressedModel(start_rng=self.rng.generate()) for _ in range(population)] if compressed_models is None else compressed_models
+        else:
+            self.models = [CompressedModel() for _ in range(population)] if compressed_models is None else compressed_models
     # Note: the paper says "20k frames", but there are 4 frames per network
     # evaluation, so we cap at 5k evaluations
     def get_best_models(self, env, max_eval=5000):
@@ -29,7 +35,11 @@ class GA:
         #    results.append(evaluate_model(env, m, max_eval=max_eval, cuda=self.cuda))
         used_frames = 0
         for m in self.models:
-            r, frames = m.evaluate(env, max_eval=max_eval, cuda=self.cuda)
+            if self.rng:
+                r, frames = m.evaluate(env, max_eval=max_eval, cuda=self.cuda,
+                        env_seed=self.rng.generate())
+            else:
+                r, frames = m.evaluate(env, max_eval=max_eval, cuda=self.cuda)
             used_frames+=frames
 
         scores = [r.score for r in self.models]
@@ -75,9 +85,13 @@ class GA:
         
         # Elitism
         self.models = [scored_models[0][0]]
-        for _ in range(self.population):
-            self.models.append(copy.deepcopy(random.choice(scored_models)[0]))
-            self.models[-1].evolve(sigma)
+        for _ in range(self.population - 1):
+            if self.rng:
+                self.models.append(copy.deepcopy(self.rng.choice(scored_models)[0]))
+                self.models[-1].evolve(sigma, self.rng.generate())
+            else:
+                self.models.append(copy.deepcopy(random.choice(scored_models)[0]))
+                self.models[-1].evolve(sigma)
             
         return median_score, mean_score, max_score, used_frames, scored_models[0][0]
     '''
