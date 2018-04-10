@@ -76,9 +76,9 @@ for it in range(args.total_frames):
         viswin = vis.line(X=x,Y=y,opts=dict(lenged=['max','median','mean']))
     else:
         vis.line(X=x,Y=y,win=viswin,update='append',opts=dict(lenged=['max','median','mean']))
-    if elapsed_frames > args.total_frames:
-        break
     if it % args.save_interval == 0:
         save_model(best,it=it)
+    if elapsed_frames > args.total_frames:
+        break
 
 print('Best model saved in {}'.format( os.path.join(save_path, args.env_name+'.pt')))
