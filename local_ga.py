@@ -14,7 +14,7 @@ class GA:
             self.models = [CompressedModel() for _ in range(population)] if compressed_models is None else compressed_models
     # Note: the paper says "20k frames", but there are 4 frames per network
     # evaluation, so we cap at 5k evaluations
-    def get_best_models(self, env, max_eval=1000):
+    def get_best_models(self, env, max_eval=5000):
         results = []
         for m in self.models:
             if self.rng:
@@ -28,7 +28,7 @@ class GA:
         scored_models.sort(key=lambda x: x[1], reverse=True)
         return scored_models, used_frames
 
-    def evolve_iter(self, env, sigma=0.005, truncation=5, max_eval=1000):
+    def evolve_iter(self, env, sigma=0.005, truncation=5, max_eval=5000):
         scored_models, used_frames = self.get_best_models(env, max_eval=max_eval )
         scores = [s for _, s in scored_models]
         median_score = np.median(scores)
