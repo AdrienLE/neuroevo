@@ -16,12 +16,15 @@ parser.add_argument('--population', type=int, default=50,
         help='Population of GA (default: 50)')
 parser.add_argument('--env-name', default='FrostbiteDeterministic-v4',
         help='environment to train on (default: FrostbiteDeterministic-v4)')
+parser.add_argument('--save-interval', type=int, default=1,
+        help='save interval. (default: 1)')
 parser.add_argument('--save-dir', default='./trained_models/',
         help='directory to save agent logs (default: ./trained_models/)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
         help='disables CUDA training')
 parser.add_argument('--no-vis', action='store_true', default=False,
         help='disables visdom visualization')
+
 
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -32,13 +35,32 @@ args.vis = not args.no_vis
 vis = visdom.Visdom(env=args.env_name)
 ga = GA(args.population, cuda=args.cuda)
 
+def save_model(model, it=None):
+    if isinstance(model, ga_model.CompressedModel):
+        model = ga_model.uncompress_model(model)
+    if args.cuda:
+        model = model.cpu()
+    save_path = args.save_dir
+    try:
+        os.makedirs(save_path)
+    except OSError:
+        pass
+    if it:
+        filename = os.path.join(save_path, args.env_name+'_{}.pt'.format(it))
+    else:
+        filename = os.path.join(save_path, args.env_name+'.pt')
+    torch.save(model,filename )
+
 # In[ ]:
 
 viswin = None
 start=time.time()
 elapsed_frames = 0
+
+
+
 for it in range(args.total_frames):
-    median_score, mean_score, max_score, used_frames = ga.evolve_iter(args.env_name)
+    median_score, mean_score, max_score, used_frames, best = ga.evolve_iter(args.env_name)
     elapsed_frames += used_frames
     print("Gen {}  Frames {}\tmax:{:.2f}  median:{:.2f}  mean:{:.2f}\ttime:{:.4f}".format(it,
         elapsed_frames, max_score,median_score,mean_score,time.time()-start))
@@ -50,15 +72,7 @@ for it in range(args.total_frames):
         vis.line(X=x,Y=y,win=viswin,update='append',opts=dict(lenged=['max','median','mean']))
     if elapsed_frames > args.total_frames:
         break
+    if it % args.save_interval == 0:
+        save_model(best,it=it)
 
-scored_models, used_frames = ga.get_best_models(args.env_name)
-best = ga_model.uncompress_model(scored_models[0][0])
-if args.cuda:
-    best = best.cpu()
-save_path = args.save_dir
-try:
-    os.makedirs(save_path)
-except OSError:
-    pass
-torch.save(best, os.path.join(save_path, args.env_name+'.pt'))
 print('Best model saved in {}'.format( os.path.join(save_path, args.env_name+'.pt')))

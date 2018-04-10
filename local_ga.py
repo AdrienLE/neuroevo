@@ -18,7 +18,7 @@ class GA:
         scored_models.sort(key=lambda x: x[1], reverse=True)
         return scored_models, used_frames
 
-    def evolve_iter(self, env, sigma=0.005, truncation=10, max_eval=5000):
+    def evolve_iter(self, env, sigma=0.005, truncation=5, max_eval=5000):
         scored_models, used_frames = self.get_best_models(env, max_eval=max_eval )
         scores = [s for _, s in scored_models]
         median_score = np.median(scores)
@@ -32,5 +32,5 @@ class GA:
             self.models.append(copy.deepcopy(random.choice(scored_models)[0]))
             self.models[-1].evolve(sigma)
             
-        return median_score, mean_score, max_score, used_frames
+        return median_score, mean_score, max_score, used_frames, scored_models[0][0]
 
