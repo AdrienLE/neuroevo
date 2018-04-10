@@ -73,6 +73,8 @@ def uncompress_model(model):
         m.evolve(sigma, rng)
     return m
 
+
+
 def random_state():
     return random.randint(0, 2**31-1)
 
@@ -84,7 +86,7 @@ class CompressedModel:
     def evolve(self, sigma, rng_state=None):
         self.other_rng.append((sigma, rng_state if rng_state is not None else random_state()))
         
-def evaluate_model(env, model, max_eval=20000, max_noop=30,env_seed=2018, render=False, cuda=False):
+def evaluate_model(env, model, max_eval, max_noop=30,env_seed=2018, render=False, cuda=False):
     import gym
     env = gym.make(env)
     if render: env.render()
